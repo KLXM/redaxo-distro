@@ -24,19 +24,30 @@ jobs:
           coverage: none
 
       - name: composer update
-        run: composer update --no-install --no-interaction --no-progress
+        run: |
+          php tools/versions.php > /tmp/before.txt
+          composer update --no-install --no-interaction --no-progress
+          php tools/versions.php > /tmp/after.txt
 
       - name: Commit und Build
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           if git diff --quiet composer.lock; then
-            echo "Keine neuen Versionen."
+            echo "Keine Änderungen."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "chore: update dependencies"
+          if diff -q /tmp/before.txt /tmp/after.txt > /dev/null; then
+            # nur Metadaten der Lock-Datei (z. B. neuere Composer-Version) – festhalten, aber kein neues Release
+            git commit -qam "chore: refresh composer.lock metadata [skip ci]"
+            git push
+            echo "Keine neuen Versionen."
+            exit 0
+          fi
+          diff /tmp/before.txt /tmp/after.txt || true
+          git commit -qam "chore: update dependencies" -m "$(diff /tmp/before.txt /tmp/after.txt | grep '^[<>]' || true)"
           git push
           # Pushes mit dem GITHUB_TOKEN starten keine Workflows – den Build daher ausdrücklich anstoßen
           gh workflow run build.yml --ref main

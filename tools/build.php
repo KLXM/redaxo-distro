@@ -179,9 +179,9 @@ function releaseNotes(array $manifest, string $root): string
         }
     }
     $lines[] = '';
-    $lines[] = '**Neu installieren:** `' . $manifest['files']['full']['name'] . '` entpacken, Document-Root auf `public/` (oder die mitgelieferte `.htaccess` im Hauptordner nutzen), `/redaxo/` aufrufen.';
+    $lines[] = '**Neu installieren:** `' . $manifest['files']['full']['name'] . '` entpacken und hochladen, Document-Root auf `public/` (oder die `.htaccess` im Hauptordner nutzen), dann `install.php` aufrufen.';
     $lines[] = '';
-    $lines[] = '**Aktualisieren:** `' . $manifest['files']['update']['name'] . '` enthält nur `vendor/` und die Composer-Dateien – `src/`, `.env`, `var/` und Medien bleiben unberührt. Danach `migrate` ausführen.';
+    $lines[] = '**Aktualisieren:** `' . $manifest['files']['update']['name'] . '` enthält nur `vendor/` und die Composer-Dateien – `src/`, `.env`, `var/` und Medien bleiben unberührt. Den alten `vendor/`-Ordner austauschen (nicht darüber entpacken), danach `migrate` ausführen.';
 
     return implode("\n", $lines) . "\n";
 }
