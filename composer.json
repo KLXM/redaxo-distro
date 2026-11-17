@@ -1,0 +1,27 @@
+{
+    "name": "klxm/redaxo-distro",
+    "type": "project",
+    "description": "REDAXO-6-Distro: Core und AddOns als fertiges ZIP mit Update-Paket",
+    "license": "MIT",
+    "require": {
+        "php": "^8.5",
+        "redaxo/core": "^6.0@dev",
+        "yakamara/yform": "6.x-dev",
+        "yakamara/yrewrite": "3.x-dev"
+    },
+    "autoload": {
+        "psr-4": {
+            "Project\\": "src/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "redaxo/composer-plugin": true,
+            "symfony/runtime": true
+        },
+        "optimize-autoloader": true,
+        "sort-packages": true
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}

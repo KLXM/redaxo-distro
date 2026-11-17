@@ -1,0 +1,42 @@
+name: Update
+
+# Holt neue Versionen von Core und AddOns (composer update) und stößt bei Änderungen einen Build an.
+on:
+  schedule:
+    - cron: '17 4 * * 1'   # montags früh
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: zip, intl, mbstring, pdo_mysql, fileinfo, iconv
+          tools: composer:v2
+          coverage: none
+
+      - name: composer update
+        run: composer update --no-install --no-interaction --no-progress
+
+      - name: Commit und Build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet composer.lock; then
+            echo "Keine neuen Versionen."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore: update dependencies"
+          git push
+          # Pushes mit dem GITHUB_TOKEN starten keine Workflows – den Build daher ausdrücklich anstoßen
+          gh workflow run build.yml --ref main

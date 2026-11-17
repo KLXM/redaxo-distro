@@ -1,0 +1,43 @@
+name: Build
+
+# Baut die Distro und veröffentlicht sie als Release: Vollpaket, Update-Paket, Manifest.
+on:
+  push:
+    branches: [main]
+    paths: [composer.json, composer.lock, distro.json, skeleton/**, tools/**]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: zip, intl, mbstring, pdo_mysql, fileinfo, iconv
+          tools: composer:v2
+          coverage: none
+
+      - name: Build
+        run: php tools/build.php --build=${{ github.run_number }}
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(php -r 'echo json_decode(file_get_contents("dist/manifest.json"), true)["version"];')
+          CHANNEL=$(php -r 'echo json_decode(file_get_contents("dist/manifest.json"), true)["channel"];')
+          FLAGS=""
+          if [ "$CHANNEL" != "stable" ]; then FLAGS="--prerelease"; fi
+          gh release create "v$VERSION" dist/*.zip dist/manifest.json \
+            --title "$(php -r 'echo json_decode(file_get_contents("dist/manifest.json"), true)["title"];') $VERSION" \
+            --notes-file dist/release-notes.md $FLAGS
