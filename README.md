@@ -56,7 +56,9 @@ So läuft es ab:
    Installer schreibt sie als `MAILER_DSN`, `REX_MAILER_FROM` und `REX_ERROR_EMAIL` in die `.env.local`.
 3. **Datenbank und Admin:** Die Migrationsseite des Cores (`/redaxo/?rex_migrate=…`) legt die Tabellen und den
    ersten Admin an.
-4. **Abschließen:** Der Installer entfernt den Migrations-Token und löscht sich selbst.
+4. **Abschließen:** Der Installer entfernt den Migrations-Token und löscht sich selbst. Vergessen geht nicht:
+   Sobald es einen Admin gibt, schließt `install.php` bei jedem Aufruf von selbst ab. Spätestens beim ersten Login
+   ins Backend räumt `src/Project.php` Installer und Token weg.
 
 ## Aktualisieren
 

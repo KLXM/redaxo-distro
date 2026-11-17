@@ -143,8 +143,11 @@ if (!$errors && 'save' === $step && !$configured) {
 // ---------- Abschließen ----------
 $finished = false;
 $selfDeleted = false;
-if ($configured && !$errors && 'cleanup' === ($_POST['step'] ?? '')) {
-    if (!hasUser($env['DATABASE_URL'])) {
+// Gibt es schon einen Admin, schließt der Installer bei jedem Aufruf von selbst ab – ein vergessener Installer
+// zeigt so nie den Migrations-Token. Zusätzlich räumt src/Project.php beim ersten Backend-Login auf.
+$userExists = $configured && hasUser($env['DATABASE_URL']);
+if ($configured && !$errors && ($userExists || 'cleanup' === ($_POST['step'] ?? ''))) {
+    if (!$userExists) {
         $errors[] = t('err_no_user');
     } else {
         $content = (string) file_get_contents($envLocal);
