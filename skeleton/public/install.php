@@ -42,7 +42,11 @@ $errors = [];
 $values = [
     'db_host' => '127.0.0.1', 'db_port' => '3306', 'db_name' => '', 'db_user' => '', 'db_password' => '',
     'db_create' => '1', 'name' => 'REDAXO', 'base_url' => guessBaseUrl(), 'mode' => 'live',
+    'mail' => 'later', 'smtp_host' => '', 'smtp_port' => '587', 'smtp_security' => 'tls', 'smtp_user' => '', 'smtp_password' => '',
+    'mail_from' => '', 'mail_from_name' => '', 'error_email' => '', 'test_to' => '',
 ];
+$notice = '';
+$keepSecrets = false;
 
 if ('POST' === $_SERVER['REQUEST_METHOD'] && !hash_equals($_SESSION['csrf'], (string) ($_POST['csrf'] ?? ''))) {
     $errors[] = t('err_session');
@@ -50,11 +54,30 @@ if ('POST' === $_SERVER['REQUEST_METHOD'] && !hash_equals($_SESSION['csrf'], (st
 }
 
 // ---------- Konfiguration schreiben ----------
-if (!$errors && 'save' === $step && !$configured) {
+if (!$errors && in_array($step, ['save', 'testmail'], true) && !$configured) {
     foreach ($values as $key => $default) {
         $values[$key] = trim((string) ($_POST[$key] ?? ''));
     }
     $values['db_create'] = isset($_POST['db_create']) ? '1' : '';
+    $keepSecrets = true;
+
+    // E-Mail (optional)
+    $mailErrors = validateMail($values);
+    if ('testmail' === $step) {
+        if ('later' === $values['mail']) {
+            $mailErrors[] = t('err_mail_choose');
+        }
+        if (!$mailErrors) {
+            $to = '' !== $values['test_to'] ? $values['test_to'] : $values['mail_from'];
+            $result = sendTestMail($root, mailerDsn($values), mailFrom($values), $to, $values['name'] ?: 'REDAXO');
+            true === $result ? $notice = sprintf(t('mail_sent'), $to) : $mailErrors[] = t('err_mail_send') . ' ' . $result;
+        }
+        $errors = $mailErrors;
+        $step = 'form';
+    }
+    $errors = array_merge($errors, 'save' === $step ? $mailErrors : []);
+}
+if (!$errors && 'save' === $step && !$configured) {
     if ('' === $values['db_name'] || !preg_match('/^[A-Za-z0-9_\-$]{1,64}$/', $values['db_name'])) {
         $errors[] = t('err_db_name');
     }
@@ -98,6 +121,11 @@ if (!$errors && 'save' === $step && !$configured) {
             'REX_INSTANCE_NAME=' . envQuote($values['name'] ?: 'REDAXO'),
             'REX_MODE=' . $values['mode'],
             'REX_BASE_URL=' . envQuote($values['base_url']),
+            ...('later' === $values['mail'] ? ['# E-Mail: später einrichten – MAILER_DSN und REX_MAILER_FROM (siehe .env)'] : [
+                'MAILER_DSN=' . envQuote(mailerDsn($values)),
+                'REX_MAILER_FROM=' . envQuote(mailFrom($values)),
+            ]),
+            ...('' !== $values['error_email'] ? ['REX_ERROR_EMAIL=' . envQuote($values['error_email'])] : []),
             '# Nur für die Installation – der Installer entfernt den Token beim Abschließen.',
             'REX_MIGRATE_TOKEN=' . $token,
         ];
@@ -287,6 +315,15 @@ code { padding: .1em .35em; border-radius: 3px; background: var(--rex-color-surf
 .success path { fill: none; stroke: var(--rex-color-success-text); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 40; stroke-dashoffset: 40; animation: draw .4s .7s forwards; }
 @keyframes draw { to { stroke-dashoffset: 0; } }
 
+.alert.success-note { background: var(--rex-color-success-subtle); color: var(--rex-color-success-text); animation: rise .4s both; }
+.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: .6rem; margin-top: .6rem; }
+.choice { display: flex; gap: .6rem; align-items: flex-start; margin: 0; padding: .7rem .8rem; border: 1px solid var(--rex-color-border-strong); border-radius: var(--rex-radius); font-weight: normal; cursor: pointer; transition: border-color .15s, background .15s; }
+.choice:has(:checked) { border-color: var(--rex-color-accent); background: var(--rex-color-accent-subtle); }
+.choice input { width: auto; min-height: 0; margin-top: .3rem; }
+.choice small { display: block; color: var(--rex-color-text-muted); font-size: .8rem; }
+.if-smtp, .if-mail { display: none; animation: rise .35s both; }
+.mail[data-mail="smtp"] .if-smtp, .mail[data-mail="smtp"] .if-mail, .mail[data-mail="sendmail"] .if-mail { display: block; }
+.default-submit { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); border: 0; padding: 0; }
 footer { margin-top: 2rem; color: var(--rex-color-text-muted); font-size: .8rem; text-align: center; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -320,6 +357,9 @@ footer { margin-top: 2rem; color: var(--rex-color-text-muted); font-size: .8rem;
         <?php endforeach ?>
     </ol>
 
+    <?php if ($notice): ?>
+        <div class="alert success-note" role="status"><?= e($notice) ?></div>
+    <?php endif ?>
     <?php if ($errors): ?>
         <div class="alert error" role="alert"><ul><?php foreach ($errors as $error): ?><li><?= e($error) ?></li><?php endforeach ?></ul></div>
     <?php endif ?>
@@ -378,6 +418,7 @@ footer { margin-top: 2rem; color: var(--rex-color-text-muted); font-size: .8rem;
             <div class="body">
                 <input type="hidden" name="csrf" value="<?= e($_SESSION['csrf']) ?>">
                 <input type="hidden" name="step" value="save">
+                <button class="default-submit" type="submit" tabindex="-1" aria-hidden="true"></button>
                 <fieldset>
                     <legend><?= e(t('database')) ?></legend>
                     <span class="note"><?= e(t('database_note')) ?></span>
@@ -386,7 +427,7 @@ footer { margin-top: 2rem; color: var(--rex-color-text-muted); font-size: .8rem;
                         <div><label for="db_port"><?= e(t('db_port')) ?></label><input id="db_port" name="db_port" value="<?= e($values['db_port']) ?>" inputmode="numeric" required></div>
                         <div><label for="db_name"><?= e(t('db_name')) ?></label><input id="db_name" name="db_name" value="<?= e($values['db_name']) ?>" required></div>
                         <div><label for="db_user"><?= e(t('db_user')) ?></label><input id="db_user" name="db_user" value="<?= e($values['db_user']) ?>" required></div>
-                        <div><label for="db_password"><?= e(t('db_password')) ?></label><input id="db_password" name="db_password" type="password" autocomplete="new-password"></div>
+                        <div><label for="db_password"><?= e(t('db_password')) ?></label><input id="db_password" name="db_password" type="password" autocomplete="new-password"<?= $keepSecrets ? ' value="' . e($values['db_password']) . '"' : '' ?>></div>
                     </div>
                     <label class="check"><input type="checkbox" name="db_create" value="1" <?= $values['db_create'] ? 'checked' : '' ?>> <?= e(t('db_create')) ?></label>
                 </fieldset>
@@ -401,6 +442,38 @@ footer { margin-top: 2rem; color: var(--rex-color-text-muted); font-size: .8rem;
                         <option value="live" <?= 'live' === $values['mode'] ? 'selected' : '' ?>><?= e(t('mode_live')) ?></option>
                         <option value="dev" <?= 'dev' === $values['mode'] ? 'selected' : '' ?>><?= e(t('mode_dev')) ?></option>
                     </select>
+                </fieldset>
+                <fieldset class="mail" data-mail="<?= e($values['mail']) ?>">
+                    <legend><?= e(t('mail')) ?></legend>
+                    <span class="note"><?= e(t('mail_note')) ?></span>
+                    <div class="choices" role="radiogroup">
+                        <?php foreach (['later', 'smtp', 'sendmail'] as $type): ?>
+                            <label class="choice"><input type="radio" name="mail" value="<?= $type ?>" <?= $values['mail'] === $type ? 'checked' : '' ?>><span><strong><?= e(t('mail_' . $type)) ?></strong><small><?= e(t('mail_' . $type . '_note')) ?></small></span></label>
+                        <?php endforeach ?>
+                    </div>
+                    <div class="if-smtp">
+                        <div class="grid">
+                            <div><label for="smtp_host"><?= e(t('smtp_host')) ?></label><input id="smtp_host" name="smtp_host" value="<?= e($values['smtp_host']) ?>" placeholder="smtp.example.org"></div>
+                            <div><label for="smtp_port"><?= e(t('smtp_port')) ?></label><input id="smtp_port" name="smtp_port" value="<?= e($values['smtp_port']) ?>" inputmode="numeric"></div>
+                            <div><label for="smtp_security"><?= e(t('smtp_security')) ?></label>
+                                <select id="smtp_security" name="smtp_security">
+                                    <?php foreach (['tls' => 'STARTTLS (587)', 'ssl' => 'SSL/TLS (465)', 'none' => t('smtp_none')] as $key => $label): ?>
+                                        <option value="<?= $key ?>" <?= $values['smtp_security'] === $key ? 'selected' : '' ?>><?= e($label) ?></option>
+                                    <?php endforeach ?>
+                                </select></div>
+                            <div><label for="smtp_user"><?= e(t('smtp_user')) ?></label><input id="smtp_user" name="smtp_user" value="<?= e($values['smtp_user']) ?>" autocomplete="off"></div>
+                            <div><label for="smtp_password"><?= e(t('smtp_password')) ?></label><input id="smtp_password" name="smtp_password" type="password" autocomplete="new-password"<?= $keepSecrets ? ' value="' . e($values['smtp_password']) . '"' : '' ?>></div>
+                        </div>
+                    </div>
+                    <div class="if-mail">
+                        <div class="grid">
+                            <div><label for="mail_from"><?= e(t('mail_from')) ?></label><input id="mail_from" name="mail_from" type="email" value="<?= e($values['mail_from']) ?>" placeholder="info@example.org"></div>
+                            <div><label for="mail_from_name"><?= e(t('mail_from_name')) ?></label><input id="mail_from_name" name="mail_from_name" value="<?= e($values['mail_from_name']) ?>"></div>
+                            <div><label for="error_email"><?= e(t('error_email')) ?></label><input id="error_email" name="error_email" type="email" value="<?= e($values['error_email']) ?>"><span class="note"><?= e(t('error_email_note')) ?></span></div>
+                            <div><label for="test_to"><?= e(t('test_to')) ?></label><input id="test_to" name="test_to" type="email" value="<?= e($values['test_to']) ?>"><span class="note"><?= e(t('test_to_note')) ?></span></div>
+                        </div>
+                        <button class="button secondary" type="submit" name="step" value="testmail" formnovalidate><?= e(t('test_send')) ?></button>
+                    </div>
                 </fieldset>
                 <button class="button" type="submit"><?= e(t('save')) ?> →</button>
                 <span class="note"><?= e(t('save_note')) ?></span>
@@ -431,6 +504,14 @@ footer { margin-top: 2rem; color: var(--rex-color-text-muted); font-size: .8rem;
         sync();
     }));
     sync();
+    // E-Mail: Felder je nach Versandart
+    document.querySelectorAll('fieldset.mail').forEach(f => f.addEventListener('change', e => {
+        if ('mail' === e.target.name) f.dataset.mail = e.target.value;
+        if ('smtp_security' === e.target.id) {
+            const port = f.querySelector('#smtp_port');
+            if (['587', '465', '25', ''].includes(port.value)) port.value = {tls: '587', ssl: '465', none: '25'}[e.target.value];
+        }
+    }));
     // Rückmeldung beim Absenden (Datenbanktest kann dauern)
     document.querySelectorAll('form[data-busy]').forEach(f => f.addEventListener('submit', () => f.querySelector('button[type=submit]')?.setAttribute('aria-busy', 'true')));
 })();
@@ -466,6 +547,17 @@ function t(string $key): string
             'err_db_user' => 'Bitte den Datenbank-Benutzer angeben.', 'err_base_url' => 'Die Adresse der Website muss mit http:// oder https:// beginnen.',
             'err_db_connect' => 'Keine Verbindung zur Datenbank:', 'err_write_env' => 'Die Datei .env.local konnte nicht geschrieben werden. Bitte Schreibrechte im Hauptordner prüfen.',
             'err_no_user' => 'Es gibt noch keinen Benutzer. Bitte zuerst Datenbank & Admin abschließen.', 'footer' => 'Installer der Distro',
+            'mail' => 'E-Mail', 'mail_note' => 'Für Passwort-Links, Formulare und Fehlerberichte. Lässt sich auch später in der .env.local einrichten.',
+            'mail_later' => 'Später einrichten', 'mail_later_note' => 'REDAXO verschickt bis dahin keine Mails.',
+            'mail_smtp' => 'SMTP', 'mail_smtp_note' => 'Postfach beim Hoster oder Mail-Dienst – empfohlen.',
+            'mail_sendmail' => 'Server (sendmail)', 'mail_sendmail_note' => 'Versand über den Webserver, wenn der Hoster das anbietet.',
+            'smtp_host' => 'SMTP-Server', 'smtp_port' => 'Port', 'smtp_security' => 'Verschlüsselung', 'smtp_none' => 'keine (nur im lokalen Netz)',
+            'smtp_user' => 'Benutzer', 'smtp_password' => 'Passwort', 'mail_from' => 'Absender-Adresse', 'mail_from_name' => 'Absender-Name',
+            'error_email' => 'Fehlerberichte an (optional)', 'error_email_note' => 'Bekommt eine Mail, wenn auf der Website ein Fehler auftritt.',
+            'test_to' => 'Testmail an (optional)', 'test_to_note' => 'Leer: an die Absender-Adresse.', 'test_send' => 'Testmail senden',
+            'mail_sent' => 'Testmail an %s verschickt – bitte im Postfach nachsehen.', 'err_mail_send' => 'Testmail nicht verschickt:',
+            'err_mail_choose' => 'Für eine Testmail bitte SMTP oder Server wählen.', 'err_mail_from' => 'Bitte eine gültige Absender-Adresse angeben.',
+            'err_smtp_host' => 'Bitte den SMTP-Server angeben.', 'mail_subject' => 'Testmail vom REDAXO-Installer', 'mail_sent_body' => 'Diese Testmail kommt vom REDAXO-Installer. Der Versand funktioniert.', 'err_email' => 'Bitte eine gültige E-Mail-Adresse angeben:',
         ],
         'en' => [
             'title' => 'Install REDAXO', 'language' => 'Language', 'theme' => 'Appearance',
@@ -491,6 +583,17 @@ function t(string $key): string
             'err_db_user' => 'Please enter the database user.', 'err_base_url' => 'The website address must start with http:// or https://.',
             'err_db_connect' => 'No connection to the database:', 'err_write_env' => 'The file .env.local could not be written. Please check the write permissions of the main folder.',
             'err_no_user' => 'There is no user yet. Please complete database & admin first.', 'footer' => 'Distro installer',
+            'mail' => 'E-mail', 'mail_note' => 'For password links, forms and error reports. Can also be set up later in .env.local.',
+            'mail_later' => 'Set up later', 'mail_later_note' => 'REDAXO sends no mails until then.',
+            'mail_smtp' => 'SMTP', 'mail_smtp_note' => 'Mailbox at your hosting provider or a mail service – recommended.',
+            'mail_sendmail' => 'Server (sendmail)', 'mail_sendmail_note' => 'Sending via the web server, if your provider offers it.',
+            'smtp_host' => 'SMTP server', 'smtp_port' => 'Port', 'smtp_security' => 'Encryption', 'smtp_none' => 'none (local network only)',
+            'smtp_user' => 'User', 'smtp_password' => 'Password', 'mail_from' => 'Sender address', 'mail_from_name' => 'Sender name',
+            'error_email' => 'Error reports to (optional)', 'error_email_note' => 'Receives a mail when an error occurs on the website.',
+            'test_to' => 'Test mail to (optional)', 'test_to_note' => 'Empty: to the sender address.', 'test_send' => 'Send test mail',
+            'mail_sent' => 'Test mail sent to %s – please check the inbox.', 'err_mail_send' => 'Test mail not sent:',
+            'err_mail_choose' => 'For a test mail please choose SMTP or server.', 'err_mail_from' => 'Please enter a valid sender address.',
+            'err_smtp_host' => 'Please enter the SMTP server.', 'mail_subject' => 'Test mail from the REDAXO installer', 'mail_sent_body' => 'This test mail comes from the REDAXO installer. Sending works.', 'err_email' => 'Please enter a valid e-mail address:',
         ],
     ];
 
@@ -576,6 +679,73 @@ function systemChecks(string $root): array
     }
 
     return $checks;
+}
+
+/** @return list<string> */
+function validateMail(array &$values): array
+{
+    $errors = [];
+    if (!in_array($values['mail'], ['later', 'smtp', 'sendmail'], true)) {
+        $values['mail'] = 'later';
+    }
+    if (!in_array($values['smtp_security'], ['tls', 'ssl', 'none'], true)) {
+        $values['smtp_security'] = 'tls';
+    }
+    if ('later' !== $values['mail'] && !filter_var($values['mail_from'], FILTER_VALIDATE_EMAIL)) {
+        $errors[] = t('err_mail_from');
+    }
+    if ('smtp' === $values['mail'] && '' === $values['smtp_host']) {
+        $errors[] = t('err_smtp_host');
+    }
+    foreach (['error_email', 'test_to'] as $key) {
+        if ('' !== $values[$key] && !filter_var($values[$key], FILTER_VALIDATE_EMAIL)) {
+            $errors[] = t('err_email') . ' ' . $values[$key];
+        }
+    }
+
+    return $errors;
+}
+
+/** DSN für MAILER_DSN, z. B. smtp://user:pass@host:587 (smtps:// für SSL auf 465) */
+function mailerDsn(array $values): string
+{
+    if ('sendmail' === $values['mail']) {
+        return 'sendmail://default';
+    }
+    $auth = '' !== $values['smtp_user'] ? rawurlencode($values['smtp_user']) . ':' . rawurlencode($values['smtp_password']) . '@' : '';
+    $scheme = 'ssl' === $values['smtp_security'] ? 'smtps' : 'smtp';
+    $query = 'none' === $values['smtp_security'] ? '?auto_tls=false' : '';
+
+    return $scheme . '://' . $auth . $values['smtp_host'] . ':' . (int) ($values['smtp_port'] ?: 587) . $query;
+}
+
+function mailFrom(array $values): string
+{
+    $name = trim(str_replace(['<', '>', '"'], '', $values['mail_from_name']));
+
+    return '' !== $name ? $name . ' <' . $values['mail_from'] . '>' : $values['mail_from'];
+}
+
+/** Schickt eine Testmail über den Symfony Mailer aus vendor/ – true oder die Fehlermeldung */
+function sendTestMail(string $root, string $dsn, string $from, string $to, string $site): true|string
+{
+    $autoload = $root . '/vendor/autoload.php';
+    if (!is_file($autoload)) {
+        return 'vendor/autoload.php fehlt';
+    }
+    require_once $autoload;
+    try {
+        $mailer = new Symfony\Component\Mailer\Mailer(Symfony\Component\Mailer\Transport::fromDsn($dsn));
+        $mailer->send(new Symfony\Component\Mime\Email()
+            ->from(Symfony\Component\Mime\Address::create($from))
+            ->to($to)
+            ->subject(t('mail_subject') . ' · ' . $site)
+            ->text(t('mail_sent_body')));
+
+        return true;
+    } catch (Throwable $e) {
+        return $e->getMessage();
+    }
 }
 
 function hasUser(string $databaseUrl): bool

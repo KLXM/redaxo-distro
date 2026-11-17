@@ -42,11 +42,18 @@ neuer Build.
 | --- | --- |
 | ![Konfiguration, dunkel, englisch](docs/installer-config-dark-en.png) | ![Installation abgeschlossen](docs/installer-done.png) |
 
+| E-Mail (optional) | E-Mail, dunkel |
+| --- | --- |
+| ![E-Mail einrichten](docs/installer-mail.png) | ![E-Mail einrichten, dunkel](docs/installer-mail-dark.png) |
+
 So läuft es ab:
 
 1. **System:** prüft PHP-Version, Erweiterungen und Schreibrechte.
 2. **Konfiguration:** Datenbank mit Verbindungstest (legt sie bei Bedarf an), Name, Adresse und Modus. Daraus
    schreibt der Installer die `.env.local`, mit zufälliger Instanz-ID und einmaligem Migrations-Token.
+   Wahlweise gleich die **E-Mail** einrichten: SMTP (Postfach beim Hoster), sendmail des Servers oder „später“.
+   Dazu Absender und Empfänger für Fehlerberichte. Der Knopf **Testmail senden** prüft die Daten sofort. Der
+   Installer schreibt sie als `MAILER_DSN`, `REX_MAILER_FROM` und `REX_ERROR_EMAIL` in die `.env.local`.
 3. **Datenbank und Admin:** Die Migrationsseite des Cores (`/redaxo/?rex_migrate=…`) legt die Tabellen und den
    ersten Admin an.
 4. **Abschließen:** Der Installer entfernt den Migrations-Token und löscht sich selbst.
