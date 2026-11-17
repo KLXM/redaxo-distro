@@ -1,4 +1,8 @@
+![REDAXO 6 Distro Builder](docs/hero.png)
+
 # REDAXO 6 Distro Builder
+
+Ein Template von [KLXM Crossmedia](https://klxm.de).
 
 Vorlage, um eigene **REDAXO-6-Distributionen** zu bauen: REDAXO plus eine feste Auswahl an AddOns als fertiges ZIP.
 Composer läuft dabei nur auf GitHub. Wer installiert, braucht weder Composer noch Shell.
@@ -27,12 +31,25 @@ neuer Build.
 1. Das ZIP entpacken und alles hochladen.
 2. Den Webserver auf `public/` zeigen lassen. Geht das beim Hoster nicht, leitet die `.htaccess` im Hauptordner
    dorthin weiter.
-3. `https://deine-domain/install.php` aufrufen:
-   1. **System:** prüft PHP-Version, Erweiterungen und Schreibrechte.
-   2. **Konfiguration:** Datenbank (mit Verbindungstest, legt sie bei Bedarf an), Name, Adresse und Modus.
-      Daraus schreibt der Installer die `.env.local`.
-   3. **Datenbank und Admin:** Die Migration des Cores legt die Tabellen und den ersten Admin an.
-   4. **Abschließen:** entfernt den Migrations-Token und löscht den Installer.
+3. `https://deine-domain/install.php` aufrufen. Der Installer sieht aus wie das REDAXO-Backend, kennt Hell- und
+   Dunkelmodus und spricht Deutsch und Englisch.
+
+| 1 · System | 2 · Konfiguration |
+| --- | --- |
+| ![Systemprüfung](docs/installer-system.png) | ![Konfiguration](docs/installer-config-light-de.png) |
+
+| Dunkel und Englisch | Fertig |
+| --- | --- |
+| ![Konfiguration, dunkel, englisch](docs/installer-config-dark-en.png) | ![Installation abgeschlossen](docs/installer-done.png) |
+
+So läuft es ab:
+
+1. **System:** prüft PHP-Version, Erweiterungen und Schreibrechte.
+2. **Konfiguration:** Datenbank mit Verbindungstest (legt sie bei Bedarf an), Name, Adresse und Modus. Daraus
+   schreibt der Installer die `.env.local`, mit zufälliger Instanz-ID und einmaligem Migrations-Token.
+3. **Datenbank und Admin:** Die Migrationsseite des Cores (`/redaxo/?rex_migrate=…`) legt die Tabellen und den
+   ersten Admin an.
+4. **Abschließen:** Der Installer entfernt den Migrations-Token und löscht sich selbst.
 
 ## Aktualisieren
 
