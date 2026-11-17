@@ -53,9 +53,36 @@ So läuft es ab:
 
 ## Aktualisieren
 
-`*-update.zip` ersetzt `vendor/`. Bitte nicht darüber entpacken, sondern austauschen: den alten Ordner `vendor/`
-umbenennen und den neuen an seine Stelle legen. Danach die Migration ausführen, über die Konsole
-(`php bin/console migrate`) oder ohne Shell über `REX_MIGRATE_TOKEN`.
+`*-update.zip` enthält nur `vendor/` und die Composer-Dateien. Projekt (`src/`), `.env`/`.env.local`, `var/` und
+Medien bleiben unberührt.
+
+1. **Sichern:** Datenbank und den bisherigen Ordner `vendor/`.
+2. **`vendor/` austauschen, nicht darüber entpacken.** Den alten Ordner umbenennen, z. B. in `vendor.old/`, und den
+   neuen an seine Stelle legen. Beim Entpacken über den alten Ordner blieben Dateien liegen, die es in der neuen
+   Version nicht mehr gibt.
+3. **Sofort migrieren**, über die Konsole:
+
+   ```bash
+   php bin/console migrate
+   ```
+
+   Oder ohne Shell:
+
+   1. In `.env.local` die Zeile `REX_MIGRATE_TOKEN=<langer Zufallswert>` ergänzen.
+   2. `https://deine-domain/redaxo/?rex_migrate=<derselbe Wert>` aufrufen.
+   3. Danach die Zeile wieder entfernen.
+4. Läuft alles, `vendor.old/` löschen. Geht etwas schief, den alten Ordner zurückbenennen und erneut migrieren.
+
+### Warum `migrate` nach jedem Update Pflicht ist
+
+- **Assets:** CSS, JS und Bilder von Core und AddOns liegen im Paket unter `vendor/<paket>/assets/`. Erst `migrate`
+  veröffentlicht sie nach `public/assets/`. Der Core löscht dabei den alten Stand jedes AddOns und kopiert den neuen
+  hinein, veraltete Dateien bleiben also nicht liegen. Deshalb ist `public/assets/` auch nicht im Update-Paket.
+- **Datenbank:** Neue Tabellen, Spalten und Migrationsschritte der neuen Versionen werden angewendet.
+- **Cache:** Zwischengespeicherte Daten passen danach wieder zum Code.
+
+Bis `migrate` gelaufen ist, arbeitet neuer PHP-Code mit alten Assets und altem Datenbankschema. Tausch und Migration
+gehören deshalb direkt zusammen.
 
 Ein Updater-AddOn, das das im Backend erledigt (Prüfsumme, Sicherung, Tausch, Migration, Rückfall), ist der
 nächste Schritt.
