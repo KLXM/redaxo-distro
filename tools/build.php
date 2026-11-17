@@ -181,7 +181,7 @@ function releaseNotes(array $manifest, string $root): string
     $lines[] = '';
     $lines[] = '**Neu installieren:** `' . $manifest['files']['full']['name'] . '` entpacken und hochladen, Document-Root auf `public/` (oder die `.htaccess` im Hauptordner nutzen), dann `install.php` aufrufen.';
     $lines[] = '';
-    $lines[] = '**Aktualisieren:** `' . $manifest['files']['update']['name'] . '` enthält nur `vendor/` und die Composer-Dateien – `src/`, `.env`, `var/` und Medien bleiben unberührt. Den alten `vendor/`-Ordner austauschen (nicht darüber entpacken) und **sofort `migrate` ausführen** – das veröffentlicht die Assets nach `public/assets/` und bringt die Datenbank auf Stand.';
+    $lines[] = '**Aktualisieren:** `' . $manifest['files']['update']['name'] . '` enthält nur `vendor/` und die Composer-Dateien – `src/`, `.env`, `var/` und Medien bleiben unberührt. Per FTP den alten `vendor/`-Ordner umbenennen, den neuen hochladen und **sofort die Migration ausführen** (`/redaxo/?rex_migrate=…`, Anleitung im README) – sie veröffentlicht die Assets nach `public/assets/` und bringt die Datenbank auf Stand.';
 
     return implode("\n", $lines) . "\n";
 }

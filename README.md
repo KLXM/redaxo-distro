@@ -53,27 +53,34 @@ So läuft es ab:
 
 ## Aktualisieren
 
-`*-update.zip` enthält nur `vendor/` und die Composer-Dateien. Projekt (`src/`), `.env`/`.env.local`, `var/` und
-Medien bleiben unberührt.
+Ein Update braucht nur ein FTP-Programm (z. B. FileZilla) und den Browser, kein Terminal.
 
-1. **Sichern:** Datenbank und den bisherigen Ordner `vendor/`.
-2. **`vendor/` austauschen, nicht darüber entpacken.** Den alten Ordner umbenennen, z. B. in `vendor.old/`, und den
-   neuen an seine Stelle legen. Beim Entpacken über den alten Ordner blieben Dateien liegen, die es in der neuen
-   Version nicht mehr gibt.
-3. **Sofort migrieren**, über die Konsole:
+`*-update.zip` enthält nur den Ordner `vendor/` mit REDAXO und den AddOns, dazu die Composer-Dateien. Deine Inhalte
+bleiben unberührt: Projekt-Dateien (`src/`), Einstellungen (`.env.local`), Medien und `var/`.
 
-   ```bash
-   php bin/console migrate
-   ```
+1. **Sichern:** Beim Hoster ein Backup der Datenbank anlegen und per FTP den Ordner `vendor/` herunterladen.
+2. **Neues Paket vorbereiten:** `*-update.zip` auf dem eigenen Rechner entpacken.
+3. **`vendor/` austauschen:**
+   1. Auf dem Server per FTP `vendor/` umbenennen in `vendor.old/`.
+   2. Den neuen Ordner `vendor/` hochladen, dazu `composer.json`, `composer.lock` und `distro-manifest.json`.
 
-   Oder ohne Shell:
+   Bitte nicht einfach über den alten Ordner hochladen. Dabei blieben Dateien liegen, die es in der neuen Version
+   nicht mehr gibt.
+4. **Sofort die Aktualisierung abschließen:**
+   1. Per FTP die Datei `.env.local` im Hauptordner öffnen. FileZilla bietet dafür „Ansehen/Bearbeiten“.
+   2. Eine Zeile ergänzen, z. B. `REX_MIGRATE_TOKEN=update-2026-11-17-geheim`. Wähle einen eigenen, langen Wert.
+   3. Im Browser `https://deine-domain/redaxo/?rex_migrate=update-2026-11-17-geheim` aufrufen, mit demselben Wert.
+      Die Seite meldet „Migration completed“.
+   4. Die Zeile in `.env.local` wieder löschen.
+5. **Prüfen:** Website und Backend aufrufen. Läuft alles, `vendor.old/` per FTP löschen. Geht etwas schief, den
+   neuen `vendor/` löschen, `vendor.old/` zurück in `vendor/` umbenennen und Schritt 4 wiederholen.
 
-   1. In `.env.local` die Zeile `REX_MIGRATE_TOKEN=<langer Zufallswert>` ergänzen.
-   2. `https://deine-domain/redaxo/?rex_migrate=<derselbe Wert>` aufrufen.
-   3. Danach die Zeile wieder entfernen.
-4. Läuft alles, `vendor.old/` löschen. Geht etwas schief, den alten Ordner zurückbenennen und erneut migrieren.
+Wer ein Terminal auf dem Server hat, kann Schritt 4 auch mit `php bin/console migrate` erledigen.
 
-### Warum `migrate` nach jedem Update Pflicht ist
+Das geplante Updater-AddOn macht daraus einen Klick im Backend: Paket prüfen, sichern, austauschen, migrieren und
+bei Fehlern zurückrollen.
+
+### Warum Schritt 4 nach jedem Update nötig ist
 
 - **Assets:** CSS, JS und Bilder von Core und AddOns liegen im Paket unter `vendor/<paket>/assets/`. Erst `migrate`
   veröffentlicht sie nach `public/assets/`. Der Core löscht dabei den alten Stand jedes AddOns und kopiert den neuen
@@ -81,11 +88,8 @@ Medien bleiben unberührt.
 - **Datenbank:** Neue Tabellen, Spalten und Migrationsschritte der neuen Versionen werden angewendet.
 - **Cache:** Zwischengespeicherte Daten passen danach wieder zum Code.
 
-Bis `migrate` gelaufen ist, arbeitet neuer PHP-Code mit alten Assets und altem Datenbankschema. Tausch und Migration
+Bis die Migration gelaufen ist, arbeitet neuer PHP-Code mit alten Assets und altem Datenbankschema. Tausch und Migration
 gehören deshalb direkt zusammen.
-
-Ein Updater-AddOn, das das im Backend erledigt (Prüfsumme, Sicherung, Tausch, Migration, Rückfall), ist der
-nächste Schritt.
 
 ## Lokal bauen
 
