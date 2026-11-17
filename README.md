@@ -69,8 +69,9 @@ bleiben unberührt: Projekt-Dateien (`src/`), Einstellungen (`.env.local`), Medi
 4. **Sofort die Aktualisierung abschließen:**
    1. Per FTP die Datei `.env.local` im Hauptordner öffnen. FileZilla bietet dafür „Ansehen/Bearbeiten“.
    2. Eine Zeile ergänzen, z. B. `REX_MIGRATE_TOKEN=update-2026-11-17-geheim`. Wähle einen eigenen, langen Wert.
-   3. Im Browser `https://deine-domain/redaxo/?rex_migrate=update-2026-11-17-geheim` aufrufen, mit demselben Wert.
-      Die Seite meldet „Migration completed“.
+   3. Im Browser `https://deine-domain/redaxo/?rex_migrate=update-2026-11-17-geheim` aufrufen, mit demselben Wert,
+      und auf **„Run migration“** klicken. Die Seite meldet danach „Migration completed“ und „The database is in line
+      with the code“.
    4. Die Zeile in `.env.local` wieder löschen.
 5. **Prüfen:** Website und Backend aufrufen. Läuft alles, `vendor.old/` per FTP löschen. Geht etwas schief, den
    neuen `vendor/` löschen, `vendor.old/` zurück in `vendor/` umbenennen und Schritt 4 wiederholen.
